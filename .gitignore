@@ -1,0 +1,11 @@
+# OS files
+.DS_Store
+
+# Node (future-proofing)
+node_modules/
+
+# Environment files (future use)
+.env
+
+# Logs
+*.log
