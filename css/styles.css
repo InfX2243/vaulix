@@ -166,3 +166,93 @@ body {
 .btn-primary:active {
     transform: scale(0.98);
 }
+
+.vault-shell {
+    width: 900px;
+    height: 500px;
+
+    display: flex;
+    background: var(--surface);
+    border-radius: 14px;
+
+    border: 1px solid rgba(0, 175, 239, 0.15);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.06);
+
+    overflow: hidden;
+}
+
+.sidebar {
+    width: 220px;
+    background: #ffffff;
+    border-right: 1px solid rgba(0,0,0,0.06);
+
+    display: flex;
+    flex-direction: column;
+}
+
+.sidebar-header {
+    padding: 16px;
+    font-weight: 600;
+    color: var(--text);
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+}
+
+.vault-list {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.vault-item {
+    padding: 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: var(--muted);
+    transition: 0.2s ease;
+}
+
+.vault-item:hover {
+    background: rgba(0, 175, 239, 0.08);
+    color: var(--text);
+}
+
+.vault-item.active {
+    background: rgba(0, 175, 239, 0.12);
+    color: var(--primary);
+    font-weight: 500;
+}
+
+.vault-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+}
+
+.status-bar {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 16px;
+
+    border-bottom: 1px solid rgba(0,0,0,0.06);
+    font-size: 0.85rem;
+    color: var(--muted);
+}
+
+.status-ok {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.content-card {
+    padding: 20px;
+}
+
+.content-card h2 {
+    margin: 0 0 10px 0;
+    font-size: 1.2rem;
+}
+
+.placeholder {
+    color: var(--muted);
+}

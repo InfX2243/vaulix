@@ -19,32 +19,66 @@
 
     <div class="app">
 
-        <!-- Header -->
+        <!-- HEADER -->
         <header class="header">
             <h1 class="logo">GhostKey</h1>
             <p class="subtitle">Zero-knowledge encrypted credential vault</p>
         </header>
 
-        <!-- Main Container -->
-        <main class="container">
+        <!-- MAIN VAULT SHELL -->
+        <main class="vault-shell">
 
-            <!-- Vault Card -->
-            <section class="card">
+            <!-- SIDEBAR -->
+            <aside class="sidebar">
 
-                <div class="card-header">
-                    <h2>Vault</h2>
-                    <span class="status">Ready</span>
+                <div class="sidebar-header">
+                    Vault
                 </div>
 
-                <div class="card-body">
+                <div class="vault-list">
+
+                    <div class="vault-item active">
+                        Personal
+                    </div>
+
+                    <div class="vault-item">
+                        Work
+                    </div>
+
+                    <div class="vault-item">
+                        Finance
+                    </div>
+
+                </div>
+
+            </aside>
+
+            <!-- MAIN CONTENT -->
+            <section class="vault-main">
+
+                <!-- STATUS BAR -->
+                <div class="status-bar">
+
+                    <div class="status-left">
+                        Status: <span class="status-ok">Secure</span>
+                    </div>
+
+                    <div class="status-right">
+                        Session: Active
+                    </div>
+
+                </div>
+
+                <!-- CONTENT AREA -->
+                <div class="content-card">
+
+                    <h2>Vault Overview</h2>
+
                     <p class="placeholder">
-                        No credentials loaded yet.
+                        No credentials selected. Initialize or select a vault item.
                     </p>
-                </div>
 
-                <button class="btn-primary">
-                    Initialize Vault
-                </button>
+                </div>
 
             </section>
 
