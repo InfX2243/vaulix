@@ -9,25 +9,65 @@ console.log("GhostKey initialized");
 // =========================
 
 const GhostKeyApp = {
+    state: "initial", // initial | loading | ready | error
     initialized: false,
-    userSession: null
+
+    data: {
+        vaults: [],
+        activeVault: null
+    },
+
+    errors: [],
+
+    listeners: []
 };
+
+function setState(newState) {
+    GhostKeyApp.state = newState;
+    notifyListeners();
+}
+
+function subscribe(callback) {
+    GhostKeyApp.listeners.push(callback);
+}
+
+function notifyListeners() {
+    GhostKeyApp.listeners.forEach(cb => cb(GhostKeyApp));
+}
 
 // =========================
 // Core Initialization
 // =========================
 
-function initApp() {
-    console.log("Initializing GhostKey system...");
-
-    GhostKeyApp.initialized = true;
-
-    // Future modules will plug in here:
+function initializeModules() {
+    // Future hooks:
     // initCrypto();
-    // initUI();
     // initStorage();
+    // initUI();
 
-    console.log("GhostKey ready.");
+    console.log("Modules initialized (placeholder)");
+}
+
+function initApp() {
+    console.log("GhostKey initializing...");
+
+    setState("loading");
+
+    try {
+        // Simulated boot process (future: crypto init, storage init)
+        initializeModules();
+
+        GhostKeyApp.initialized = true;
+
+        setState("ready");
+
+        console.log("GhostKey ready.");
+    } catch (err) {
+        console.error("Initialization failed:", err);
+
+        GhostKeyApp.errors.push(err);
+        setState("error");
+    }
 }
 
 // =========================
@@ -35,3 +75,6 @@ function initApp() {
 // =========================
 
 document.addEventListener("DOMContentLoaded", initApp);
+subscribe((app) => {
+    console.log("[GhostKey State Update]", app.state);
+});
