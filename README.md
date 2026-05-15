@@ -1,96 +1,118 @@
-# GhostKey
+# Vaulix - Security that stays with you
 
-GhostKey is a client-side, zero-knowledge credential vault designed to securely encrypt and manage sensitive data directly in the browser before storing it in an external persistence layer.
+A modern, privacy-first password vault built with React, TypeScript, and Vite.
 
-All encryption operations occur locally, ensuring that plaintext credentials are never transmitted or stored in an unencrypted form.
+## 🔐 Features
+
+- **Zero-Knowledge Encryption**: All encryption/decryption happens locally in the browser
+- **Local-First Architecture**: Your passwords never leave your device in plaintext
+- **Secure Storage**: IndexedDB encrypted storage for vault data
+- **Responsive Design**: Works seamlessly on desktop and mobile devices
+- **Optional Cloud Sync**: Encrypted vault syncing with Google Drive (coming soon)
+
+## 🛠 Tech Stack
+
+- **Frontend**: React 18.2 + TypeScript 5
+- **Build Tool**: Vite 4.4
+- **Styling**: Tailwind CSS 3.3
+- **UI Components**: Lucide Icons
+- **Encryption**: Web Crypto API (future integration)
+
+## 📦 Installation
+
+1. Install dependencies:
+```bash
+npm install
+```
+
+2. Start the development server:
+```bash
+npm run dev
+```
+
+3. Build for production:
+```bash
+npm run build
+```
+
+4. Preview the production build:
+```bash
+npm run preview
+```
+
+## 🎨 Color Palette
+
+- **Primary Blue**: `#1F4B99`
+- **Accent Cyan**: `#4DD6FF`
+- **Dark Background**: `#0B0F14`
+- **Dark Card**: `#111827`
+- **Light Background**: `#F5F7FA`
+- **Light Text**: `#94A3B8`
+
+Colors are configured in `tailwind.config.js` under `theme.extend.colors.vaulix`.
+
+## 📁 Project Structure
+
+```
+vaulix/
+├── src/
+│   ├── App.tsx           # Main app component
+│   ├── index.css         # Global styles and Tailwind directives
+│   └── main.tsx          # React entry point
+├── index.html            # HTML template
+├── tailwind.config.js    # Tailwind CSS configuration
+├── vite.config.ts        # Vite configuration
+├── tsconfig.json         # TypeScript configuration
+└── package.json          # Project dependencies and scripts
+```
+
+## 🚀 Development
+
+### Available Scripts
+
+- `npm run dev` - Start development server
+- `npm run build` - Build for production
+- `npm run preview` - Preview production build
+- `npm run lint` - Run ESLint
+
+### Environment
+
+The project uses Vite's built-in environment variables. Create a `.env` file if needed for additional configuration.
+
+## 🔒 Security
+
+- All passwords are encrypted locally using the Web Crypto API
+- No sensitive data is transmitted to any server
+- Optional Google Drive sync only transmits encrypted blobs
+- Vaulix never has access to unencrypted vault contents
+
+## 📝 MVP Features (Phase 1)
+
+- [x] Project setup with Vite + React + TypeScript
+- [x] Landing page with vault creation/unlock
+- [x] Basic dashboard layout
+- [x] Color palette integration
+- [ ] Master password encryption with PBKDF2
+- [ ] IndexedDB vault storage
+- [ ] Entry CRUD operations
+- [ ] Search and filter functionality
+- [ ] Password generator
+- [ ] Auto-lock functionality
+- [ ] Export/import functionality
+- [ ] Google Drive sync (Phase 2)
+
+## 🤝 Contributing
+
+This is a personal privacy project. Contributions are welcome for security improvements, UX enhancements, and bug fixes.
+
+## 📄 License
+
+MIT License - see LICENSE file for details
+
+## 🙋 Support
+
+For issues, questions, or suggestions, please open an issue on GitHub.
 
 ---
 
-## Overview
-
-GhostKey is built around a zero-knowledge architecture where the user retains full control of encryption keys. The system ensures that:
-
-- Credentials are encrypted in the browser before leaving the client
-- Decryption is only possible with a user-provided master key
-- External storage contains only encrypted payloads
-
-This design minimizes trust assumptions on any backend or storage provider.
-
----
-
-## Core Principles
-
-### Zero-Knowledge Design
-The system is structured so that stored data is never readable without the user’s master key.
-
-### Client-Side Cryptography
-All cryptographic operations are executed in the browser using the Web Crypto API.
-
-### Minimal Exposure
-No plaintext credentials are stored in local storage, transmitted over the network, or exposed in logs.
-
----
-
-## Planned Architecture
-
-GhostKey follows a fully client-driven architecture:
-
-- Frontend Application: Handles UI and cryptographic operations
-- Web Crypto API: Provides secure encryption primitives
-- Google Sheets Storage Layer: Stores only encrypted payloads
-- Google Apps Script: Acts as a lightweight API interface
-
----
-
-## Security Model
-
-GhostKey assumes that:
-
-- The client environment is trusted by the user
-- The master password is never transmitted or stored
-- Encryption keys are derived locally using PBKDF2
-- Each credential entry uses unique cryptographic salts and initialization vectors
-
----
-
-## Data Flow
-
-1. User enters credential data in the browser
-2. System derives encryption key from master password
-3. Data is encrypted locally using AES-GCM
-4. Encrypted payload is sent to external storage
-5. Retrieval requires decryption using the same master key locally
-
----
-
-## Technology Stack
-
-- HTML5
-- CSS3
-- Vanilla JavaScript
-- Web Crypto API
-- Google Sheets (planned storage layer)
-- Google Apps Script (planned API layer)
-
----
-
-## Project Status
-
-GhostKey is currently in early development. Core architecture and encryption modules are under active implementation.
-
----
-
-## Security Disclaimer
-
-GhostKey is a client-side encryption system. Security depends heavily on correct usage, secure master password selection, and trusted execution environment. It is not intended to replace audited enterprise-grade password managers at this stage.
-
----
-
-## Roadmap
-
-- Core UI implementation
-- AES-GCM encryption module
-- PBKDF2 key derivation system
-- Credential storage integration
-- Retrieval and decryption flow
-- UI/UX refinement and optimization
+**Vaulix** - Security that stays with you. 🔐
