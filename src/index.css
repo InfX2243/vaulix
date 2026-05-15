@@ -1,0 +1,60 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+* {
+  @apply transition-colors duration-200;
+}
+
+html {
+  @apply scroll-smooth;
+}
+
+body {
+  @apply bg-vaulix-dark-bg text-vaulix-light-bg;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  @apply w-2;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-vaulix-dark-card;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-vaulix-primary rounded;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-vaulix-accent;
+}
+
+/* Utility classes */
+.btn-primary {
+  @apply px-4 py-2 bg-vaulix-primary text-white rounded-lg font-medium hover:bg-opacity-90 transition-all duration-200;
+}
+
+.btn-secondary {
+  @apply px-4 py-2 bg-vaulix-dark-card text-vaulix-light-bg rounded-lg font-medium hover:bg-vaulix-primary hover:text-white transition-all duration-200;
+}
+
+.btn-accent {
+  @apply px-4 py-2 bg-vaulix-accent text-vaulix-dark-bg rounded-lg font-medium hover:bg-opacity-90 transition-all duration-200;
+}
+
+.card {
+  @apply bg-vaulix-dark-card rounded-lg p-4 border border-vaulix-dark-bg hover:border-vaulix-primary transition-all duration-200;
+}
+
+.input {
+  @apply w-full px-4 py-2 bg-vaulix-dark-bg border border-vaulix-dark-card rounded-lg text-vaulix-light-bg placeholder-vaulix-light-text focus:outline-none focus:border-vaulix-primary focus:ring-1 focus:ring-vaulix-primary;
+}
+
+.badge {
+  @apply inline-block px-3 py-1 bg-vaulix-primary text-white text-sm rounded-full;
+}
