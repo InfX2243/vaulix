@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Lock, ShieldCheck as ShieldIcon } from 'lucide-react'
-import { deriveMasterKey, encryptPayload, generateRandomBytes, importAesKey, randomBase64, wrapKey } from '../lib/crypto'
+import { createVault, serializeVault } from '../lib/vaultContainer'
 import { saveVault } from '../lib/vaultStorage'
 
 interface CreateVaultFlowProps {
@@ -12,6 +12,7 @@ type RecoveryPayload = {
   version: string
   recoveryKey: string
   wrappedVekWithRecovery: { iv: string; data: string }
+  vaultId: string
 }
 
 export default function CreateVaultFlow({ onComplete, onCancel }: CreateVaultFlowProps) {
@@ -71,40 +72,23 @@ export default function CreateVaultFlow({ onComplete, onCancel }: CreateVaultFlo
     setError(null)
     setIsProcessing(true)
     try {
-      const salt = generateRandomBytes(16)
-      const masterKey = await deriveMasterKey(password, salt)
-      const vek = generateRandomBytes(32)
-      const vaultKey = await importAesKey(vek)
-      const wrappedVekWithMaster = await wrapKey(vek, masterKey)
-
-      const recoveryKey = randomBase64(32)
-      const recoveryKeyBytes = Uint8Array.from(atob(recoveryKey), (c) => c.charCodeAt(0))
-      const recoveryAesKey = await importAesKey(recoveryKeyBytes)
-      const wrappedVekWithRecovery = await wrapKey(vek, recoveryAesKey)
-
-      const initialVault = {
-        createdAt: new Date().toISOString(),
-        version: '1.0',
-        entries: [],
-      }
-
-      const vaultBlob = await encryptPayload(initialVault, vaultKey)
-      const vaultId = (crypto as any).randomUUID ? (crypto as any).randomUUID() : 'vault-' + Math.random().toString(36).slice(2, 10)
-
+      const { vlx, recoveryKey } = await createVault({ password, name: vaultName })
       const vaultRecord = {
-        id: vaultId,
+        id: vlx.metadata.vaultId,
         name: vaultName.trim(),
-        createdAt: new Date().toISOString(),
-        salt: btoa(String.fromCharCode(...salt)),
-        vaultBlob,
-        wrappedVekWithMaster,
-        wrappedVekWithRecovery,
+        createdAt: vlx.metadata.createdAt,
+        salt: vlx.encryption.salt,
+        vlx: serializeVault(vlx),
+        vaultBlob: vlx.vaultData,
+        wrappedVekWithMaster: vlx.wrappedVek.withMasterKey,
+        wrappedVekWithRecovery: vlx.wrappedVek.withRecoveryKey,
       }
 
       const recoveryPayload: RecoveryPayload = {
         version: '1.0',
         recoveryKey,
-        wrappedVekWithRecovery,
+        wrappedVekWithRecovery: vlx.wrappedVek.withRecoveryKey,
+        vaultId: vlx.metadata.vaultId,
       }
 
       const blob = new Blob([JSON.stringify(recoveryPayload, null, 2)], { type: 'application/json' })

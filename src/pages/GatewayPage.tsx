@@ -1,16 +1,40 @@
  
 
-import { useState } from 'react'
+import { type ChangeEvent, useRef, useState } from 'react'
 import CreateVaultFlow from '../components/CreateVaultFlow'
-import { PlusSquare, Key, DownloadCloud, ArrowLeft } from 'lucide-react'
+import { PlusSquare, Key, DownloadCloud, ArrowLeft, X, HardDriveUpload, Cloud, Link as LinkIcon } from 'lucide-react'
 
-export default function GatewayPage({ vaultExists, onCreateVault, onContinueVault, onBack }: {
+export default function GatewayPage({ vaultExists, onCreateVault, onContinueVault, onImportVault, onBack }: {
   vaultExists: boolean
   onCreateVault: () => void
   onContinueVault: () => void
+  onImportVault: (file: File) => Promise<void>
   onBack: () => void
 }) {
   const [isCreating, setIsCreating] = useState(false)
+  const [isImporting, setIsImporting] = useState(false)
+  const [showImportOptions, setShowImportOptions] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
+
+  const handleImportClick = () => {
+    setShowImportOptions(true)
+  }
+
+  const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    if (!file) return
+    setIsImporting(true)
+    try {
+      await onImportVault(file)
+      setShowImportOptions(false)
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to import vault file.'
+      alert(message)
+    } finally {
+      setIsImporting(false)
+      event.target.value = ''
+    }
+  }
 
   return (
     <div className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(77,214,255,0.06),_transparent_40%),linear-gradient(180deg,#0B0F14_0%,#111827_100%)] text-vaulix-main-text flex flex-col">
@@ -50,15 +74,72 @@ export default function GatewayPage({ vaultExists, onCreateVault, onContinueVaul
               <Card
                 Icon={DownloadCloud}
                 title="Import backup"
-                description="Import an encrypted backup file (.vlx/.vlk)."
-                cta="Import"
-                onClick={() => alert('Import coming soon')}
+                description={vaultExists ? 'Import an encrypted backup file (.vlx).' : 'No local vault found. Import your .vlx file to continue.'}
+                cta={isImporting ? 'Importing...' : 'Import .vlx'}
+                onClick={handleImportClick}
                 tone="secondary"
+                disabled={isImporting}
               />
             </div>
           ) : (
             <div className="flex items-center justify-center">
               <CreateVaultFlow onComplete={() => { setIsCreating(false); onCreateVault() }} onCancel={() => setIsCreating(false)} />
+            </div>
+          )}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".vlx,application/json"
+            className="hidden"
+            onChange={handleFileChange}
+          />
+          {showImportOptions && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="w-full max-w-xl rounded-3xl border border-vaulix-surface-bg bg-vaulix-dark-card/95 p-6 sm:p-7">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">Import vault backup</h3>
+                    <p className="mt-1 text-sm text-vaulix-secondary-text">Choose how you want to import your `.vlx` file.</p>
+                  </div>
+                  <button onClick={() => setShowImportOptions(false)} className="rounded-xl border border-vaulix-surface-bg p-2 text-vaulix-secondary-text hover:text-vaulix-main-text">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <button
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isImporting}
+                    className="rounded-2xl border border-vaulix-surface-bg bg-vaulix-main-bg/20 p-4 text-left transition-all hover:border-vaulix-accent disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <HardDriveUpload className="h-5 w-5 text-vaulix-accent" />
+                    <p className="mt-3 text-sm font-semibold">{isImporting ? 'Importing...' : 'Upload from device'}</p>
+                    <p className="mt-1 text-xs text-vaulix-secondary-text">Select local `.vlx` file.</p>
+                  </button>
+
+                  <button
+                    onClick={() => alert('Google Drive import UI will be enabled in a future update.')}
+                    className="rounded-2xl border border-vaulix-surface-bg bg-vaulix-main-bg/20 p-4 text-left transition-all hover:border-vaulix-accent"
+                  >
+                    <Cloud className="h-5 w-5 text-vaulix-accent" />
+                    <p className="mt-3 text-sm font-semibold">Google Drive</p>
+                    <p className="mt-1 text-xs text-vaulix-secondary-text">Coming soon (frontend ready).</p>
+                  </button>
+
+                  <button
+                    onClick={() => alert('Import by URL is planned.')}
+                    className="rounded-2xl border border-vaulix-surface-bg bg-vaulix-main-bg/20 p-4 text-left transition-all hover:border-vaulix-accent"
+                  >
+                    <LinkIcon className="h-5 w-5 text-vaulix-accent" />
+                    <p className="mt-3 text-sm font-semibold">Import from URL</p>
+                    <p className="mt-1 text-xs text-vaulix-secondary-text">Coming soon (frontend ready).</p>
+                  </button>
+                </div>
+
+                <div className="mt-5 flex justify-end">
+                  <button onClick={() => setShowImportOptions(false)} className="btn-secondary">Close</button>
+                </div>
+              </div>
             </div>
           )}
         </div>
