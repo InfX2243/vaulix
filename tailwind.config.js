@@ -8,12 +8,18 @@ export default {
     extend: {
       colors: {
         vaulix: {
-          primary: '#1F4B99',    // Deep blue
-          accent: '#4DD6FF',     // Bright cyan
-          'dark-bg': '#0B0F14',  // Very dark background
-          'dark-card': '#111827', // Dark card background
-          'light-bg': '#F5F7FA', // Light background
-          'light-text': '#94A3B8', // Light text/secondary
+          // Strict brand tokens
+          'main-bg': '#0B0F14',
+          'surface-bg': '#111827',
+          primary: '#1F4B99',
+          accent: '#4DD6FF',
+          'main-text': '#F5F7FA',
+          'secondary-text': '#94A3B8',
+          // Legacy aliases for compatibility
+          'dark-bg': '#0B0F14',
+          'dark-card': '#111827',
+          'light-bg': '#F5F7FA',
+          'light-text': '#94A3B8',
         },
       },
       fontFamily: {
