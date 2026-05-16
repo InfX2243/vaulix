@@ -8,6 +8,7 @@ export interface VaultRecord {
   createdAt: string
   salt: string
   name?: string
+  vlx?: string
   vaultBlob: EncryptedFragment
   wrappedVekWithMaster: EncryptedFragment
   wrappedVekWithRecovery: EncryptedFragment
@@ -16,6 +17,7 @@ export interface VaultRecord {
 const DB_NAME = 'vaulix'
 const STORE_NAME = 'vaults'
 const DB_VERSION = 1
+const LOCAL_VLX_KEY = 'vaulix_vlx'
 
 function openDatabase(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
@@ -40,7 +42,10 @@ export async function saveVault(record: VaultRecord) {
     const store = transaction.objectStore(STORE_NAME)
     const request = store.put(record)
 
-    request.onsuccess = () => resolve()
+    request.onsuccess = () => {
+      if (record.vlx) localStorage.setItem(LOCAL_VLX_KEY, record.vlx)
+      resolve()
+    }
     request.onerror = () => reject(request.error)
   })
 }
@@ -54,7 +59,15 @@ export async function loadVault() {
 
     request.onsuccess = () => {
       const result = request.result ?? []
-      resolve(result.length ? (result[0] as VaultRecord) : null)
+      const first = result.length ? (result[0] as VaultRecord) : null
+      if (first && !first.vlx) {
+        const localVlx = localStorage.getItem(LOCAL_VLX_KEY)
+        if (localVlx) {
+          resolve({ ...first, vlx: localVlx })
+          return
+        }
+      }
+      resolve(first)
     }
     request.onerror = () => reject(request.error)
   })
@@ -69,4 +82,12 @@ export async function listVaults(): Promise<VaultRecord[]> {
     request.onsuccess = () => resolve(request.result as VaultRecord[])
     request.onerror = () => reject(request.error)
   })
+}
+
+export function saveVlxLocal(serialized: string) {
+  localStorage.setItem(LOCAL_VLX_KEY, serialized)
+}
+
+export function loadVlxLocal() {
+  return localStorage.getItem(LOCAL_VLX_KEY)
 }
