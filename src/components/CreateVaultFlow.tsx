@@ -1,18 +1,12 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, Lock, ShieldCheck as ShieldIcon } from 'lucide-react'
 import { createVault, serializeVault } from '../lib/vaultContainer'
+import { serializeRecoveryToBinary, type RecoveryPayload } from '../lib/recoveryContainer'
 import { saveVault } from '../lib/vaultStorage'
 
 interface CreateVaultFlowProps {
   onComplete: () => void
   onCancel: () => void
-}
-
-type RecoveryPayload = {
-  version: string
-  recoveryKey: string
-  wrappedVekWithRecovery: { iv: string; data: string }
-  vaultId: string
 }
 
 export default function CreateVaultFlow({ onComplete, onCancel }: CreateVaultFlowProps) {
@@ -78,7 +72,7 @@ export default function CreateVaultFlow({ onComplete, onCancel }: CreateVaultFlo
         name: vaultName.trim(),
         createdAt: vlx.metadata.createdAt,
         salt: vlx.encryption.salt,
-        vlx: serializeVault(vlx),
+        vlx: await serializeVault(vlx),
         vaultBlob: vlx.vaultData,
         wrappedVekWithMaster: vlx.wrappedVek.withMasterKey,
         wrappedVekWithRecovery: vlx.wrappedVek.withRecoveryKey,
@@ -91,7 +85,8 @@ export default function CreateVaultFlow({ onComplete, onCancel }: CreateVaultFlo
         vaultId: vlx.metadata.vaultId,
       }
 
-      const blob = new Blob([JSON.stringify(recoveryPayload, null, 2)], { type: 'application/json' })
+      const recoveryBytes = await serializeRecoveryToBinary(recoveryPayload)
+      const blob = new Blob([recoveryBytes], { type: 'application/octet-stream' })
       const filename = `vaulix-recovery-${vaultName.trim().replace(/[^a-z0-9_-]/gi, '-')}-${new Date().toISOString().slice(0, 10)}.vlk`
 
       const url = URL.createObjectURL(blob)

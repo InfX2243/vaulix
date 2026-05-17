@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import LandingPage from './pages/LandingPage'
 import GatewayPage from './pages/GatewayPage'
 import DashboardPage, { PageType } from './pages/DashboardPage'
-import { deserializeVault } from './lib/vaultContainer'
+import { deserializeVaultFromBinary, serializeVault } from './lib/vaultContainer'
 import { saveVault } from './lib/vaultStorage'
 
 type AppStage = 'landing' | 'gateway' | 'vault'
@@ -39,15 +39,16 @@ export default function App() {
   }
 
   const handleImportVault = async (file: File) => {
-    const content = await file.text()
-    const vlx = await deserializeVault(content)
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    const vlx = await deserializeVaultFromBinary(bytes)
+    const serialized = await serializeVault(vlx)
 
     await saveVault({
       id: vlx.metadata.vaultId,
       name: vlx.metadata.name,
       createdAt: vlx.metadata.createdAt,
       salt: vlx.encryption.salt,
-      vlx: content,
+      vlx: serialized,
       vaultBlob: vlx.vaultData,
       wrappedVekWithMaster: vlx.wrappedVek.withMasterKey,
       wrappedVekWithRecovery: vlx.wrappedVek.withRecoveryKey,
