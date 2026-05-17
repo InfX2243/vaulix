@@ -1,6 +1,7 @@
 import React from 'react'
 import { Plus, Settings as SettingsIcon, LogOut, Search, ShieldCheck, Sparkles, Lock, Eye, EyeOff, Copy, Check, Download } from 'lucide-react'
-import { addCredential, deserializeVault, serializeVaultToBinary, unlockVault, type VaultEntry } from '../lib/vaultContainer'
+import { addCredential, deserializeVault, resetMasterPasswordWithRecovery, serializeVaultToBinary, unlockVault, type RecoveryPayloadLike, type VaultEntry } from '../lib/vaultContainer'
+import { deserializeRecoveryFromBinary, serializeRecoveryToBinary } from '../lib/recoveryContainer'
 import { loadVault, loadVlxLocal, saveVault, saveVlxLocal } from '../lib/vaultStorage'
 
 export type PageType = 'dashboard' | 'settings'
@@ -18,6 +19,7 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
   const [unlockError, setUnlockError] = React.useState<string | null>(null)
   const [entries, setEntries] = React.useState<VaultEntry[]>([])
   const [showAddModal, setShowAddModal] = React.useState(false)
+  const [showResetModal, setShowResetModal] = React.useState(false)
 
   React.useEffect(() => {
     let mounted = true
@@ -95,6 +97,18 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
     return entry.service.toLowerCase().includes(q) || entry.username.toLowerCase().includes(q) || (entry.notes || '').toLowerCase().includes(q)
   })
 
+  const handleFinalizePasswordReset = async (params: { serialized: string; newPassword: string }) => {
+    setSerializedVlx(params.serialized)
+    saveVlxLocal(params.serialized)
+    const existing = await loadVault()
+    if (existing) await saveVault({ ...existing, vlx: params.serialized })
+
+    const unlocked = await unlockVault(params.serialized, params.newPassword)
+    setEntries(unlocked.data.entries ?? [])
+    setMasterPassword(params.newPassword)
+    setUnlockError(null)
+  }
+
   return (
     <div className="flex h-screen bg-[radial-gradient(circle_at_top,_rgba(77,214,255,0.06),_transparent_40%),linear-gradient(180deg,#0B0F14_0%,#111827_100%)] text-vaulix-main-text">
       <aside className="hidden w-72 flex-shrink-0 border-r border-vaulix-surface-bg bg-vaulix-dark-card/85 p-6 md:block">
@@ -157,6 +171,7 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
               onUnlock={handleUnlock}
               unlockError={unlockError}
               onAddCredential={handleAddCredential}
+              onForgotPassword={() => setShowResetModal(true)}
             />
           )}
           {currentPage === 'settings' && <SettingsPage />}
@@ -172,11 +187,21 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
           }}
         />
       )}
+      {showResetModal && serializedVlx && (
+        <ResetPasswordModal
+          serializedVlx={serializedVlx}
+          onClose={() => setShowResetModal(false)}
+          onComplete={async (payload) => {
+            await handleFinalizePasswordReset(payload)
+            setShowResetModal(false)
+          }}
+        />
+      )}
     </div>
   )
 }
 
-function VaultDashboard({ vaultName, entries, isUnlocked, unlockInput, onUnlockInputChange, onUnlock, unlockError, onAddCredential }: {
+function VaultDashboard({ vaultName, entries, isUnlocked, unlockInput, onUnlockInputChange, onUnlock, unlockError, onAddCredential, onForgotPassword }: {
   vaultName: string
   entries: VaultEntry[]
   isUnlocked: boolean
@@ -185,6 +210,7 @@ function VaultDashboard({ vaultName, entries, isUnlocked, unlockInput, onUnlockI
   onUnlock: () => void
   unlockError: string | null
   onAddCredential: () => void
+  onForgotPassword: () => void
 }) {
   return (
     <div className="space-y-6">
@@ -214,6 +240,9 @@ function VaultDashboard({ vaultName, entries, isUnlocked, unlockInput, onUnlockI
               <input type="password" value={unlockInput} onChange={(e) => onUnlockInputChange(e.target.value)} className="input flex-1" placeholder="Master password" />
               <button onClick={onUnlock} className="btn-primary">Unlock</button>
             </div>
+            <button onClick={onForgotPassword} className="mt-4 text-sm text-vaulix-secondary-text hover:text-vaulix-main-text underline underline-offset-4">
+              Forgot password?
+            </button>
             {unlockError && <p className="mt-3 text-sm text-red-500">{unlockError}</p>}
           </div>
         </section>
@@ -244,6 +273,119 @@ function VaultDashboard({ vaultName, entries, isUnlocked, unlockInput, onUnlockI
           <p className="text-sm leading-6 text-vaulix-secondary-text">Credentials remain encrypted at rest inside your local `.vlx` container.</p>
         </div>
       </section>
+    </div>
+  )
+}
+
+function ResetPasswordModal({
+  serializedVlx,
+  onClose,
+  onComplete,
+}: {
+  serializedVlx: string
+  onClose: () => void
+  onComplete: (payload: { serialized: string; newPassword: string }) => Promise<void>
+}) {
+  const [recoveryPayload, setRecoveryPayload] = React.useState<RecoveryPayloadLike | null>(null)
+  const [newPassword, setNewPassword] = React.useState('')
+  const [confirmPassword, setConfirmPassword] = React.useState('')
+  const [error, setError] = React.useState<string | null>(null)
+  const [isProcessing, setIsProcessing] = React.useState(false)
+  const [resetResult, setResetResult] = React.useState<{ serialized: string; recoveryBytes: Uint8Array; filename: string; newPassword: string } | null>(null)
+  const [hasDownloaded, setHasDownloaded] = React.useState(false)
+
+  const canReset = !!recoveryPayload && newPassword.length >= 8 && newPassword === confirmPassword
+
+  const handleRecoveryFile = async (file: File) => {
+    try {
+      setError(null)
+      const bytes = new Uint8Array(await file.arrayBuffer())
+      const parsed = await deserializeRecoveryFromBinary(bytes)
+      setRecoveryPayload(parsed)
+    } catch {
+      setError('Invalid recovery file. Please select a valid .vlk file.')
+    }
+  }
+
+  const handleReset = async () => {
+    if (!canReset || !recoveryPayload) return
+    setIsProcessing(true)
+    setError(null)
+    try {
+      const result = await resetMasterPasswordWithRecovery({
+        serialized: serializedVlx,
+        recovery: recoveryPayload,
+        newPassword,
+      })
+      const recoveryBytes = await serializeRecoveryToBinary(result.newRecovery)
+      const filename = `vaulix-recovery-reset-${new Date().toISOString().slice(0, 10)}.vlk`
+      setResetResult({ serialized: result.serialized, recoveryBytes, filename, newPassword })
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to reset master password.')
+    } finally {
+      setIsProcessing(false)
+    }
+  }
+
+  const handleDownload = () => {
+    if (!resetResult) return
+    const bytes = new Uint8Array(resetResult.recoveryBytes.length)
+    bytes.set(resetResult.recoveryBytes)
+    const blob = new Blob([bytes], { type: 'application/octet-stream' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = resetResult.filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+    setHasDownloaded(true)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-2xl rounded-3xl border border-vaulix-surface-bg bg-vaulix-dark-card/95 p-6">
+        <h3 className="text-xl font-semibold">Reset master password</h3>
+        {!resetResult ? (
+          <div className="mt-5 space-y-4">
+            <label className="block">
+              <span className="mb-2 block text-sm text-vaulix-secondary-text">Upload recovery file (.vlk)</span>
+              <input
+                type="file"
+                accept=".vlk,application/octet-stream"
+                onChange={(e) => { const file = e.target.files?.[0]; if (file) void handleRecoveryFile(file) }}
+                className="input"
+              />
+            </label>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} placeholder="New master password" className="input" />
+              <input type="password" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} placeholder="Confirm new password" className="input" />
+            </div>
+            {error && <p className="text-sm text-red-500">{error}</p>}
+            <div className="flex items-center justify-between gap-3">
+              <button onClick={onClose} className="btn-secondary">Cancel</button>
+              <button onClick={handleReset} disabled={!canReset || isProcessing} className="btn-primary ml-auto">Reset password</button>
+            </div>
+          </div>
+        ) : (
+          <div className="mt-5 space-y-4">
+            <p className="text-sm leading-7 text-vaulix-secondary-text">
+              Master password has been reset. Download your new recovery file to continue.
+            </p>
+            <div className="flex items-center justify-between gap-3">
+              <button onClick={handleDownload} className="btn-primary">Download new .vlk</button>
+              <button
+                onClick={() => void onComplete({ serialized: resetResult.serialized, newPassword: resetResult.newPassword })}
+                disabled={!hasDownloaded}
+                className="btn-primary"
+              >
+                Continue to vault
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
