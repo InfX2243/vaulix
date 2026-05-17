@@ -1,6 +1,6 @@
 import React from 'react'
 import { Plus, Settings as SettingsIcon, LogOut, Search, ShieldCheck, Sparkles, Lock, Eye, EyeOff, Copy, Check, Download } from 'lucide-react'
-import { addCredential, unlockVault, type VaultEntry } from '../lib/vaultContainer'
+import { addCredential, deserializeVault, serializeVaultToBinary, unlockVault, type VaultEntry } from '../lib/vaultContainer'
 import { loadVault, loadVlxLocal, saveVault, saveVlxLocal } from '../lib/vaultStorage'
 
 export type PageType = 'dashboard' | 'settings'
@@ -70,12 +70,14 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
     if (existing) await saveVault({ ...existing, vlx: result.serialized })
   }
 
-  const handleExportVault = () => {
+  const handleExportVault = async () => {
     if (!serializedVlx) {
       alert('No vault data available to export.')
       return
     }
-    const blob = new Blob([serializedVlx], { type: 'application/json' })
+    const vlx = await deserializeVault(serializedVlx)
+    const binary = await serializeVaultToBinary(vlx)
+    const blob = new Blob([binary], { type: 'application/octet-stream' })
     const filename = `${vaultName.toLowerCase().replace(/[^a-z0-9_-]/gi, '-') || 'vaulix-vault'}-${new Date().toISOString().slice(0, 10)}.vlx`
     const url = URL.createObjectURL(blob)
     const link = document.createElement('a')
