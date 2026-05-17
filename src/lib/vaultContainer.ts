@@ -23,6 +23,12 @@ export interface VlxFile {
   integrity: { algorithm: 'SHA-256'; metadataDigest: string; vaultDataDigest: string }
 }
 export interface CreateVaultResult { vlx: VlxFile; recoveryKey: string }
+export interface RecoveryPayloadLike {
+  version: string
+  recoveryKey: string
+  wrappedVekWithRecovery: { iv: string; data: string }
+  vaultId: string
+}
 
 const encoder = new TextEncoder()
 const decoder = new TextDecoder()
@@ -282,4 +288,55 @@ export async function addCredential(params: { serialized: string; password: stri
   const updated: VlxFile = { ...vlx, metadata: { ...vlx.metadata, updatedAt: now, lastUnlockedAt: now }, vaultData: encrypted, integrity: vlx.integrity }
   updated.integrity = await computeIntegrity(updated.metadata, updated.vaultData)
   return { serialized: await serializeVault(updated), entry, entries }
+}
+
+export async function resetMasterPasswordWithRecovery(params: {
+  serialized: string
+  recovery: RecoveryPayloadLike
+  newPassword: string
+}): Promise<{ serialized: string; newRecovery: RecoveryPayloadLike }> {
+  const vlx = await deserializeVault(params.serialized)
+  if (params.recovery.vaultId !== vlx.metadata.vaultId) {
+    throw new Error('Recovery file does not match this vault.')
+  }
+
+  const recoveryBytes = Uint8Array.from(atob(params.recovery.recoveryKey), (c) => c.charCodeAt(0))
+  const recoveryKey = await importAesKey(recoveryBytes)
+  const vekRaw = await unwrapKey(vlx.wrappedVek.withRecoveryKey, recoveryKey)
+
+  const salt = Uint8Array.from(atob(vlx.encryption.salt), (c) => c.charCodeAt(0))
+  const newMasterKey = await deriveMasterKey(params.newPassword, salt)
+  const wrappedWithNewMaster = await wrapKey(vekRaw, newMasterKey)
+
+  const newRecoveryKey = randomBase64(32)
+  const newRecoveryKeyBytes = Uint8Array.from(atob(newRecoveryKey), (c) => c.charCodeAt(0))
+  const newRecoveryAesKey = await importAesKey(newRecoveryKeyBytes)
+  const wrappedWithNewRecovery = await wrapKey(vekRaw, newRecoveryAesKey)
+
+  const now = new Date().toISOString()
+  const updated: VlxFile = {
+    ...vlx,
+    metadata: {
+      ...vlx.metadata,
+      updatedAt: now,
+      lastUnlockedAt: now,
+      lastPasswordResetAt: now,
+      recoveryGeneratedAt: now,
+    },
+    wrappedVek: {
+      withMasterKey: wrappedWithNewMaster,
+      withRecoveryKey: wrappedWithNewRecovery,
+    },
+  }
+  updated.integrity = await computeIntegrity(updated.metadata, updated.vaultData)
+
+  return {
+    serialized: await serializeVault(updated),
+    newRecovery: {
+      version: '1.0',
+      recoveryKey: newRecoveryKey,
+      wrappedVekWithRecovery: wrappedWithNewRecovery,
+      vaultId: updated.metadata.vaultId,
+    },
+  }
 }
