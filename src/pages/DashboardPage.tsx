@@ -1,6 +1,6 @@
 import React from 'react'
-import { Plus, Settings as SettingsIcon, LogOut, Search, ShieldCheck, Sparkles, Lock, Eye, EyeOff, Copy, Check, Download } from 'lucide-react'
-import { addCredential, deserializeVault, resetMasterPasswordWithRecovery, serializeVaultToBinary, unlockVault, type RecoveryPayloadLike, type VaultEntry } from '../lib/vaultContainer'
+import { Plus, Settings as SettingsIcon, LogOut, Search, ShieldCheck, Sparkles, Lock, Eye, EyeOff, Copy, Check, Download, Pencil, Trash2 } from 'lucide-react'
+import { addCredential, deleteCredential, deserializeVault, resetMasterPasswordWithRecovery, serializeVaultToBinary, unlockVault, updateCredential, type RecoveryPayloadLike, type VaultEntry } from '../lib/vaultContainer'
 import { deserializeRecoveryFromBinary, serializeRecoveryToBinary } from '../lib/recoveryContainer'
 import { loadVault, loadVlxLocal, saveVault, saveVlxLocal } from '../lib/vaultStorage'
 
@@ -20,6 +20,7 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
   const [entries, setEntries] = React.useState<VaultEntry[]>([])
   const [showAddModal, setShowAddModal] = React.useState(false)
   const [showResetModal, setShowResetModal] = React.useState(false)
+  const [editingEntry, setEditingEntry] = React.useState<VaultEntry | null>(null)
 
   React.useEffect(() => {
     let mounted = true
@@ -68,6 +69,35 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
     setEntries(result.entries)
     saveVlxLocal(result.serialized)
 
+    const existing = await loadVault()
+    if (existing) await saveVault({ ...existing, vlx: result.serialized })
+  }
+
+  const handleCredentialUpdated = async (entryId: string, payload: { service: string; username: string; secret: string; notes?: string }) => {
+    if (!serializedVlx || !masterPassword) return
+    const result = await updateCredential({
+      serialized: serializedVlx,
+      password: masterPassword,
+      entryId,
+      updates: payload,
+    })
+    setSerializedVlx(result.serialized)
+    setEntries(result.entries)
+    saveVlxLocal(result.serialized)
+    const existing = await loadVault()
+    if (existing) await saveVault({ ...existing, vlx: result.serialized })
+  }
+
+  const handleCredentialDeleted = async (entryId: string) => {
+    if (!serializedVlx || !masterPassword) return
+    const result = await deleteCredential({
+      serialized: serializedVlx,
+      password: masterPassword,
+      entryId,
+    })
+    setSerializedVlx(result.serialized)
+    setEntries(result.entries)
+    saveVlxLocal(result.serialized)
     const existing = await loadVault()
     if (existing) await saveVault({ ...existing, vlx: result.serialized })
   }
@@ -172,6 +202,8 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
               unlockError={unlockError}
               onAddCredential={handleAddCredential}
               onForgotPassword={() => setShowResetModal(true)}
+              onEditCredential={(entry) => setEditingEntry(entry)}
+              onDeleteCredential={(entryId) => void handleCredentialDeleted(entryId)}
             />
           )}
           {currentPage === 'settings' && <SettingsPage />}
@@ -197,11 +229,21 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
           }}
         />
       )}
+      {editingEntry && (
+        <EditCredentialModal
+          entry={editingEntry}
+          onClose={() => setEditingEntry(null)}
+          onSave={async (payload) => {
+            await handleCredentialUpdated(editingEntry.id, payload)
+            setEditingEntry(null)
+          }}
+        />
+      )}
     </div>
   )
 }
 
-function VaultDashboard({ vaultName, entries, isUnlocked, unlockInput, onUnlockInputChange, onUnlock, unlockError, onAddCredential, onForgotPassword }: {
+function VaultDashboard({ vaultName, entries, isUnlocked, unlockInput, onUnlockInputChange, onUnlock, unlockError, onAddCredential, onForgotPassword, onEditCredential, onDeleteCredential }: {
   vaultName: string
   entries: VaultEntry[]
   isUnlocked: boolean
@@ -211,6 +253,8 @@ function VaultDashboard({ vaultName, entries, isUnlocked, unlockInput, onUnlockI
   unlockError: string | null
   onAddCredential: () => void
   onForgotPassword: () => void
+  onEditCredential: (entry: VaultEntry) => void
+  onDeleteCredential: (entryId: string) => void
 }) {
   return (
     <div className="space-y-6">
@@ -261,7 +305,7 @@ function VaultDashboard({ vaultName, entries, isUnlocked, unlockInput, onUnlockI
           </div>
         </section>
       ) : (
-        <CredentialList entries={entries} />
+        <CredentialList entries={entries} onEdit={onEditCredential} onDelete={onDeleteCredential} />
       )}
 
       <section className="grid gap-4 lg:grid-cols-3">
@@ -390,7 +434,7 @@ function ResetPasswordModal({
   )
 }
 
-function CredentialList({ entries }: { entries: VaultEntry[] }) {
+function CredentialList({ entries, onEdit, onDelete }: { entries: VaultEntry[]; onEdit: (entry: VaultEntry) => void; onDelete: (entryId: string) => void }) {
   const [visibleSecrets, setVisibleSecrets] = React.useState<Record<string, boolean>>({})
   const [copiedId, setCopiedId] = React.useState<string | null>(null)
 
@@ -414,6 +458,12 @@ function CredentialList({ entries }: { entries: VaultEntry[] }) {
               <p className="mt-1 text-sm text-vaulix-secondary-text">{entry.username}</p>
             </div>
             <div className="flex items-center gap-2">
+              <button onClick={() => onEdit(entry)} className="rounded-xl border border-vaulix-surface-bg px-3 py-1.5 text-xs text-vaulix-secondary-text hover:text-vaulix-main-text">
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button onClick={() => onDelete(entry.id)} className="rounded-xl border border-vaulix-surface-bg px-3 py-1.5 text-xs text-vaulix-secondary-text hover:text-red-400">
+                <Trash2 className="h-4 w-4" />
+              </button>
               <button onClick={() => toggleReveal(entry.id)} className="rounded-xl border border-vaulix-surface-bg px-3 py-1.5 text-xs text-vaulix-secondary-text hover:text-vaulix-main-text">
                 {visibleSecrets[entry.id] ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
@@ -423,12 +473,53 @@ function CredentialList({ entries }: { entries: VaultEntry[] }) {
             </div>
           </div>
           <div className="mt-4 rounded-xl border border-vaulix-surface-bg/70 bg-vaulix-main-bg/20 px-4 py-3 font-mono text-sm">
-            {visibleSecrets[entry.id] ? entry.secret : '•'.repeat(Math.max(12, entry.secret.length))}
+            {visibleSecrets[entry.id] ? entry.secret : '*'.repeat(Math.max(12, entry.secret.length))}
           </div>
           {!!entry.notes && <p className="mt-3 text-sm text-vaulix-secondary-text">{entry.notes}</p>}
         </article>
       ))}
     </section>
+  )
+}
+
+function EditCredentialModal({ entry, onClose, onSave }: {
+  entry: VaultEntry
+  onClose: () => void
+  onSave: (payload: { service: string; username: string; secret: string; notes?: string }) => Promise<void>
+}) {
+  const [service, setService] = React.useState(entry.service)
+  const [username, setUsername] = React.useState(entry.username)
+  const [secret, setSecret] = React.useState(entry.secret)
+  const [notes, setNotes] = React.useState(entry.notes || '')
+  const [isSaving, setIsSaving] = React.useState(false)
+  const canSave = service.trim() && username.trim() && secret.trim()
+
+  const handleSave = async () => {
+    if (!canSave) return
+    setIsSaving(true)
+    try {
+      await onSave({ service, username, secret, notes })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-lg rounded-3xl border border-vaulix-surface-bg bg-vaulix-dark-card/95 p-6">
+        <h3 className="text-xl font-semibold">Edit credential</h3>
+        <div className="mt-5 space-y-3">
+          <input value={service} onChange={(e) => setService(e.target.value)} placeholder="Service" className="input" />
+          <input value={username} onChange={(e) => setUsername(e.target.value)} placeholder="Username or email" className="input" />
+          <input value={secret} onChange={(e) => setSecret(e.target.value)} placeholder="Password / secret" className="input" />
+          <textarea value={notes} onChange={(e) => setNotes(e.target.value)} placeholder="Notes (optional)" className="input min-h-[90px]" />
+        </div>
+        <div className="mt-6 flex items-center justify-between gap-3">
+          <button onClick={onClose} className="btn-secondary">Cancel</button>
+          <button onClick={handleSave} disabled={!canSave || isSaving} className="btn-primary ml-auto">Save changes</button>
+        </div>
+      </div>
+    </div>
   )
 }
 
