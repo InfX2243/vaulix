@@ -4,6 +4,7 @@ export interface EncryptedFragment { iv: string; data: string }
 export interface VaultEntry { id: string; service: string; username: string; secret: string; notes?: string; createdAt: string; updatedAt: string }
 export interface VaultData { entries: VaultEntry[] }
 export interface AddCredentialInput { service: string; username: string; secret: string; notes?: string }
+export interface UpdateCredentialInput { service: string; username: string; secret: string; notes?: string }
 export interface VaultMetadata {
   createdAt: string
   updatedAt: string
@@ -288,6 +289,52 @@ export async function addCredential(params: { serialized: string; password: stri
   const updated: VlxFile = { ...vlx, metadata: { ...vlx.metadata, updatedAt: now, lastUnlockedAt: now }, vaultData: encrypted, integrity: vlx.integrity }
   updated.integrity = await computeIntegrity(updated.metadata, updated.vaultData)
   return { serialized: await serializeVault(updated), entry, entries }
+}
+
+export async function updateCredential(params: {
+  serialized: string
+  password: string
+  entryId: string
+  updates: UpdateCredentialInput
+}): Promise<{ serialized: string; entries: VaultEntry[] }> {
+  const { vlx, data } = await unlockVault(params.serialized, params.password)
+  const existing = data.entries ?? []
+  const now = new Date().toISOString()
+  const entries = existing.map((entry) => {
+    if (entry.id !== params.entryId) return entry
+    return {
+      ...entry,
+      service: params.updates.service.trim(),
+      username: params.updates.username.trim(),
+      secret: params.updates.secret,
+      notes: params.updates.notes?.trim() || '',
+      updatedAt: now,
+    }
+  })
+  if (!entries.some((entry) => entry.id === params.entryId)) throw new Error('Credential not found')
+
+  const key = await unwrapVekWithPassword(vlx, params.password)
+  const encrypted = await encryptPayload({ entries } as VaultData, key)
+  const updated: VlxFile = { ...vlx, metadata: { ...vlx.metadata, updatedAt: now, lastUnlockedAt: now }, vaultData: encrypted, integrity: vlx.integrity }
+  updated.integrity = await computeIntegrity(updated.metadata, updated.vaultData)
+  return { serialized: await serializeVault(updated), entries }
+}
+
+export async function deleteCredential(params: {
+  serialized: string
+  password: string
+  entryId: string
+}): Promise<{ serialized: string; entries: VaultEntry[] }> {
+  const { vlx, data } = await unlockVault(params.serialized, params.password)
+  const existing = data.entries ?? []
+  const entries = existing.filter((entry) => entry.id !== params.entryId)
+  if (entries.length === existing.length) throw new Error('Credential not found')
+  const now = new Date().toISOString()
+  const key = await unwrapVekWithPassword(vlx, params.password)
+  const encrypted = await encryptPayload({ entries } as VaultData, key)
+  const updated: VlxFile = { ...vlx, metadata: { ...vlx.metadata, updatedAt: now, lastUnlockedAt: now }, vaultData: encrypted, integrity: vlx.integrity }
+  updated.integrity = await computeIntegrity(updated.metadata, updated.vaultData)
+  return { serialized: await serializeVault(updated), entries }
 }
 
 export async function resetMasterPasswordWithRecovery(params: {
