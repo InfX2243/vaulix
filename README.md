@@ -1,118 +1,86 @@
-# Vaulix - Security that stays with you
+# Vaulix
 
-A modern, privacy-first password vault built with React, TypeScript, and Vite.
+Security that stays with you.
 
-## 🔐 Features
+Vaulix is a local-first, privacy-focused password vault built with React + TypeScript.  
+Encryption and decryption happen in the browser, and vault data is stored as encrypted binary containers.
 
-- **Zero-Knowledge Encryption**: All encryption/decryption happens locally in the browser
-- **Local-First Architecture**: Your passwords never leave your device in plaintext
-- **Secure Storage**: IndexedDB encrypted storage for vault data
-- **Responsive Design**: Works seamlessly on desktop and mobile devices
-- **Optional Cloud Sync**: Encrypted vault syncing with Google Drive (coming soon)
+## Product Highlights
 
-## 🛠 Tech Stack
+- Zero-knowledge model: no plaintext credentials persisted.
+- Binary vault container (`.vlx`) for encrypted backup/portability.
+- Binary recovery file (`.vlk`) for master-password reset flow.
+- Gateway import/export flow for vault portability.
+- Credential UX with add, masked reveal, and copy actions.
 
-- **Frontend**: React 18.2 + TypeScript 5
-- **Build Tool**: Vite 4.4
-- **Styling**: Tailwind CSS 3.3
-- **UI Components**: Lucide Icons
-- **Encryption**: Web Crypto API (future integration)
+## Current Scope
 
-## 📦 Installation
+Implemented now:
 
-1. Install dependencies:
+- Landing, gateway, and dashboard flows.
+- Vault creation with strong-password gating.
+- Binary `.vlx` + `.vlk` generation and validation.
+- Vault import/export from/to binary files.
+- Forgot-password reset using `.vlk`, with forced new `.vlk` download before re-entry.
+- Credential add flow with decrypt -> mutate -> re-encrypt pipeline.
+
+Planned next:
+
+- Edit/delete credentials.
+- Recovery-only unlock mode.
+- Cloud sync providers (Google Drive).
+- Session timeout/auto-lock hardening.
+
+## Tech Stack
+
+- React 18
+- TypeScript 5
+- Vite
+- Tailwind CSS
+- Web Crypto API (PBKDF2 + AES-GCM)
+- IndexedDB + localStorage
+
+## Quick Start
+
 ```bash
 npm install
-```
-
-2. Start the development server:
-```bash
 npm run dev
 ```
 
-3. Build for production:
+Production build:
+
 ```bash
 npm run build
-```
-
-4. Preview the production build:
-```bash
 npm run preview
 ```
 
-## 🎨 Color Palette
+## Security Model (Current)
 
-- **Primary Blue**: `#1F4B99`
-- **Accent Cyan**: `#4DD6FF`
-- **Dark Background**: `#0B0F14`
-- **Dark Card**: `#111827`
-- **Light Background**: `#F5F7FA`
-- **Light Text**: `#94A3B8`
+- Master password derives wrapping key via PBKDF2-SHA256.
+- Vault Encryption Key (VEK) encrypts vault payload with AES-GCM.
+- VEK is wrapped by:
+  - master-derived key
+  - recovery key
+- Binary envelope digest checks detect file tampering.
 
-Colors are configured in `tailwind.config.js` under `theme.extend.colors.vaulix`.
+Note: File obfuscation and encryption help reduce accidental leakage and tampering risk, but endpoint security (device compromise, keylogging, malware) remains out of scope for client-only apps.
 
-## 📁 Project Structure
+## Documentation
 
-```
-vaulix/
-├── src/
-│   ├── App.tsx           # Main app component
-│   ├── index.css         # Global styles and Tailwind directives
-│   └── main.tsx          # React entry point
-├── index.html            # HTML template
-├── tailwind.config.js    # Tailwind CSS configuration
-├── vite.config.ts        # Vite configuration
-├── tsconfig.json         # TypeScript configuration
-└── package.json          # Project dependencies and scripts
-```
+See [`docs/`](docs/) for full project documentation:
 
-## 🚀 Development
+- Product and architecture
+- Vault/recovery binary formats
+- Creation and reset flows
+- Implementation status and roadmap
+- Updated mermaid diagrams
 
-### Available Scripts
+## Scripts
 
-- `npm run dev` - Start development server
-- `npm run build` - Build for production
-- `npm run preview` - Preview production build
-- `npm run lint` - Run ESLint
+- `npm run dev` - start development server
+- `npm run build` - compile and build production assets
+- `npm run preview` - preview built app
 
-### Environment
+## License
 
-The project uses Vite's built-in environment variables. Create a `.env` file if needed for additional configuration.
-
-## 🔒 Security
-
-- All passwords are encrypted locally using the Web Crypto API
-- No sensitive data is transmitted to any server
-- Optional Google Drive sync only transmits encrypted blobs
-- Vaulix never has access to unencrypted vault contents
-
-## 📝 MVP Features (Phase 1)
-
-- [x] Project setup with Vite + React + TypeScript
-- [x] Landing page with vault creation/unlock
-- [x] Basic dashboard layout
-- [x] Color palette integration
-- [ ] Master password encryption with PBKDF2
-- [ ] IndexedDB vault storage
-- [ ] Entry CRUD operations
-- [ ] Search and filter functionality
-- [ ] Password generator
-- [ ] Auto-lock functionality
-- [ ] Export/import functionality
-- [ ] Google Drive sync (Phase 2)
-
-## 🤝 Contributing
-
-This is a personal privacy project. Contributions are welcome for security improvements, UX enhancements, and bug fixes.
-
-## 📄 License
-
-MIT License - see LICENSE file for details
-
-## 🙋 Support
-
-For issues, questions, or suggestions, please open an issue on GitHub.
-
----
-
-**Vaulix** - Security that stays with you. 🔐
+MIT
