@@ -3,17 +3,20 @@
 import { type ChangeEvent, useRef, useState } from 'react'
 import CreateVaultFlow from '../components/CreateVaultFlow'
 import { PlusSquare, Key, DownloadCloud, ArrowLeft, X, HardDriveUpload, Cloud, Link as LinkIcon } from 'lucide-react'
+import type { VaultRecord } from '../lib/vaultStorage'
 
-export default function GatewayPage({ vaultExists, onCreateVault, onContinueVault, onImportVault, onBack }: {
+export default function GatewayPage({ vaultExists, vaults, onCreateVault, onContinueVault, onImportVault, onBack }: {
   vaultExists: boolean
-  onCreateVault: () => void
-  onContinueVault: () => void
+  vaults: VaultRecord[]
+  onCreateVault: (vaultId: string) => void | Promise<void>
+  onContinueVault: (vaultId: string) => void | Promise<void>
   onImportVault: (file: File) => Promise<void>
   onBack: () => void
 }) {
   const [isCreating, setIsCreating] = useState(false)
   const [isImporting, setIsImporting] = useState(false)
   const [showImportOptions, setShowImportOptions] = useState(false)
+  const [showVaultPicker, setShowVaultPicker] = useState(false)
   const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   const handleImportClick = () => {
@@ -67,7 +70,7 @@ export default function GatewayPage({ vaultExists, onCreateVault, onContinueVaul
                 title="Continue vault"
                 description="Unlock an existing local vault."
                 cta="Continue"
-                onClick={onContinueVault}
+                onClick={() => setShowVaultPicker(true)}
                 tone={vaultExists ? 'accent' : 'muted'}
                 disabled={!vaultExists}
               />
@@ -83,7 +86,7 @@ export default function GatewayPage({ vaultExists, onCreateVault, onContinueVaul
             </div>
           ) : (
             <div className="flex items-center justify-center">
-              <CreateVaultFlow onComplete={() => { setIsCreating(false); onCreateVault() }} onCancel={() => setIsCreating(false)} />
+              <CreateVaultFlow onComplete={(vaultId) => { setIsCreating(false); void onCreateVault(vaultId) }} onCancel={() => setIsCreating(false)} />
             </div>
           )}
           <input
@@ -138,6 +141,40 @@ export default function GatewayPage({ vaultExists, onCreateVault, onContinueVaul
 
                 <div className="mt-5 flex justify-end">
                   <button onClick={() => setShowImportOptions(false)} className="btn-secondary">Close</button>
+                </div>
+              </div>
+            </div>
+          )}
+          {showVaultPicker && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+              <div className="w-full max-w-2xl rounded-3xl border border-vaulix-surface-bg bg-vaulix-dark-card/95 p-6 sm:p-7">
+                <div className="mb-6 flex items-center justify-between">
+                  <div>
+                    <h3 className="text-xl font-semibold">Choose a vault</h3>
+                    <p className="mt-1 text-sm text-vaulix-secondary-text">Select a vault to continue.</p>
+                  </div>
+                  <button onClick={() => setShowVaultPicker(false)} className="rounded-xl border border-vaulix-surface-bg p-2 text-vaulix-secondary-text hover:text-vaulix-main-text">
+                    <X className="h-4 w-4" />
+                  </button>
+                </div>
+                <div className="max-h-[360px] space-y-3 overflow-auto pr-1">
+                  {vaults.map((vault) => (
+                    <button
+                      key={vault.id}
+                      onClick={async () => { await onContinueVault(vault.id); setShowVaultPicker(false) }}
+                      className="w-full rounded-2xl border border-vaulix-surface-bg bg-vaulix-main-bg/20 p-4 text-left transition-all hover:border-vaulix-accent"
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <p className="text-base font-semibold text-vaulix-main-text">{vault.name || 'Unnamed Vault'}</p>
+                        {vault.source === 'imported' && <span className="rounded-full bg-vaulix-accent/15 px-3 py-1 text-xs font-semibold text-vaulix-accent">Imported</span>}
+                      </div>
+                      <p className="mt-2 text-xs text-vaulix-secondary-text">Created: {new Date(vault.createdAt).toLocaleString()}</p>
+                      <p className="mt-1 text-xs text-vaulix-secondary-text">Last opened: {vault.lastOpenedAt ? new Date(vault.lastOpenedAt).toLocaleString() : 'Never'}</p>
+                    </button>
+                  ))}
+                </div>
+                <div className="mt-5 flex justify-end">
+                  <button onClick={() => setShowVaultPicker(false)} className="btn-secondary">Close</button>
                 </div>
               </div>
             </div>

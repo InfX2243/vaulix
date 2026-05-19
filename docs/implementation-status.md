@@ -19,6 +19,19 @@
 13. Gateway import options modal:
    - local file upload active
    - Google Drive / URL placeholders
+14. Multi-vault support on a single device:
+   - created and imported vaults are both listed
+   - "Continue vault" opens vault selector
+   - vault card metadata includes `createdAt` and `lastOpenedAt`
+   - imported vaults are tagged with an `Imported` badge
+15. In-dashboard vault management:
+   - switch vault modal while inside vault experience
+   - guarded vault deletion wizard:
+     - warning/acknowledgement step
+     - mandatory `.vlx` + `.vlk` backup download step
+     - typed vault-name confirmation before deletion
+     - if imported vault has no stored `.vlk`, Vaulix generates a fresh `.vlk` from current unlocked master-password session before download
+   - deletion updates local persistence and UI state immediately
 
 ## In Progress / Next
 

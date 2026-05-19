@@ -5,7 +5,7 @@ import { serializeRecoveryToBinary, type RecoveryPayload } from '../lib/recovery
 import { saveVault } from '../lib/vaultStorage'
 
 interface CreateVaultFlowProps {
-  onComplete: () => void
+  onComplete: (vaultId: string) => void
   onCancel: () => void
 }
 
@@ -67,17 +67,6 @@ export default function CreateVaultFlow({ onComplete, onCancel }: CreateVaultFlo
     setIsProcessing(true)
     try {
       const { vlx, recoveryKey } = await createVault({ password, name: vaultName })
-      const vaultRecord = {
-        id: vlx.metadata.vaultId,
-        name: vaultName.trim(),
-        createdAt: vlx.metadata.createdAt,
-        salt: vlx.encryption.salt,
-        vlx: await serializeVault(vlx),
-        vaultBlob: vlx.vaultData,
-        wrappedVekWithMaster: vlx.wrappedVek.withMasterKey,
-        wrappedVekWithRecovery: vlx.wrappedVek.withRecoveryKey,
-      }
-
       const recoveryPayload: RecoveryPayload = {
         version: '1.0',
         recoveryKey,
@@ -86,6 +75,19 @@ export default function CreateVaultFlow({ onComplete, onCancel }: CreateVaultFlo
       }
 
       const recoveryBytes = await serializeRecoveryToBinary(recoveryPayload)
+      const vaultRecord = {
+        id: vlx.metadata.vaultId,
+        name: vaultName.trim(),
+        createdAt: vlx.metadata.createdAt,
+        source: 'created' as const,
+        lastOpenedAt: new Date().toISOString(),
+        salt: vlx.encryption.salt,
+        vlx: await serializeVault(vlx),
+        vlk: btoa(String.fromCharCode(...recoveryBytes)),
+        vaultBlob: vlx.vaultData,
+        wrappedVekWithMaster: vlx.wrappedVek.withMasterKey,
+        wrappedVekWithRecovery: vlx.wrappedVek.withRecoveryKey,
+      }
       const blob = new Blob([recoveryBytes], { type: 'application/octet-stream' })
       const filename = `vaulix-recovery-${vaultName.trim().replace(/[^a-z0-9_-]/gi, '-')}-${new Date().toISOString().slice(0, 10)}.vlk`
 
@@ -119,7 +121,7 @@ export default function CreateVaultFlow({ onComplete, onCancel }: CreateVaultFlo
     try {
       await saveVault(pendingVaultRecord)
       setStage('final')
-      onComplete()
+      onComplete(pendingVaultRecord.id)
     } catch (err) {
       console.error(err)
       setError('Unable to save vault locally.')

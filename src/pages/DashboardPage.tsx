@@ -1,15 +1,19 @@
 import React from 'react'
 import { Plus, Settings as SettingsIcon, LogOut, Search, ShieldCheck, Sparkles, Lock, Eye, EyeOff, Copy, Check, Download, Pencil, Trash2 } from 'lucide-react'
-import { addCredential, deleteCredential, deserializeVault, resetMasterPasswordWithRecovery, serializeVaultToBinary, unlockVault, updateCredential, type RecoveryPayloadLike, type VaultEntry } from '../lib/vaultContainer'
+import { addCredential, deleteCredential, deserializeVault, resetMasterPasswordWithRecovery, rotateRecoveryWithMasterPassword, serializeVaultToBinary, unlockVault, updateCredential, type RecoveryPayloadLike, type VaultEntry } from '../lib/vaultContainer'
 import { deserializeRecoveryFromBinary, serializeRecoveryToBinary } from '../lib/recoveryContainer'
-import { loadVault, loadVlxLocal, saveVault, saveVlxLocal } from '../lib/vaultStorage'
+import { loadVaultById, loadVlxLocal, saveVault, saveVlxLocal, type VaultRecord } from '../lib/vaultStorage'
 
 export type PageType = 'dashboard' | 'settings'
 
-export default function DashboardLayout({ currentPage, setCurrentPage, onLock }: {
+export default function DashboardLayout({ activeVaultId, vaults, currentPage, setCurrentPage, onLock, onSwitchVault, onDeleteVault }: {
+  activeVaultId: string | null
+  vaults: VaultRecord[]
   currentPage: PageType
   setCurrentPage: (p: PageType) => void
   onLock: () => void
+  onSwitchVault: (vaultId: string) => Promise<void>
+  onDeleteVault: (vaultId: string) => Promise<void>
 }) {
   const [vaultName, setVaultName] = React.useState('My Vault')
   const [searchQuery, setSearchQuery] = React.useState('')
@@ -21,13 +25,21 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
   const [showAddModal, setShowAddModal] = React.useState(false)
   const [showResetModal, setShowResetModal] = React.useState(false)
   const [editingEntry, setEditingEntry] = React.useState<VaultEntry | null>(null)
+  const [currentVaultRecord, setCurrentVaultRecord] = React.useState<VaultRecord | null>(null)
+  const [showSwitchModal, setShowSwitchModal] = React.useState(false)
+  const [showDeleteModal, setShowDeleteModal] = React.useState(false)
 
   React.useEffect(() => {
     let mounted = true
-    loadVault().then((vault) => {
+    if (!activeVaultId) return () => { mounted = false }
+    loadVaultById(activeVaultId).then((vault) => {
       if (!mounted) return
+      setCurrentVaultRecord(vault)
       setVaultName(vault?.name?.trim() || 'My Vault')
       setSerializedVlx(vault?.vlx || loadVlxLocal())
+      setMasterPassword('')
+      setUnlockInput('')
+      setEntries([])
     }).catch(() => {
       if (!mounted) return
       setSerializedVlx(loadVlxLocal())
@@ -36,7 +48,7 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
     return () => {
       mounted = false
     }
-  }, [])
+  }, [activeVaultId])
 
   const isUnlocked = !!masterPassword
 
@@ -69,7 +81,8 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
     setEntries(result.entries)
     saveVlxLocal(result.serialized)
 
-    const existing = await loadVault()
+    if (!activeVaultId) return
+    const existing = await loadVaultById(activeVaultId)
     if (existing) await saveVault({ ...existing, vlx: result.serialized })
   }
 
@@ -84,7 +97,8 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
     setSerializedVlx(result.serialized)
     setEntries(result.entries)
     saveVlxLocal(result.serialized)
-    const existing = await loadVault()
+    if (!activeVaultId) return
+    const existing = await loadVaultById(activeVaultId)
     if (existing) await saveVault({ ...existing, vlx: result.serialized })
   }
 
@@ -98,7 +112,8 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
     setSerializedVlx(result.serialized)
     setEntries(result.entries)
     saveVlxLocal(result.serialized)
-    const existing = await loadVault()
+    if (!activeVaultId) return
+    const existing = await loadVaultById(activeVaultId)
     if (existing) await saveVault({ ...existing, vlx: result.serialized })
   }
 
@@ -127,11 +142,12 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
     return entry.service.toLowerCase().includes(q) || entry.username.toLowerCase().includes(q) || (entry.notes || '').toLowerCase().includes(q)
   })
 
-  const handleFinalizePasswordReset = async (params: { serialized: string; newPassword: string }) => {
+  const handleFinalizePasswordReset = async (params: { serialized: string; newPassword: string; vlk: string }) => {
     setSerializedVlx(params.serialized)
     saveVlxLocal(params.serialized)
-    const existing = await loadVault()
-    if (existing) await saveVault({ ...existing, vlx: params.serialized })
+    if (!activeVaultId) return
+    const existing = await loadVaultById(activeVaultId)
+    if (existing) await saveVault({ ...existing, vlx: params.serialized, vlk: params.vlk })
 
     const unlocked = await unlockVault(params.serialized, params.newPassword)
     setEntries(unlocked.data.entries ?? [])
@@ -160,6 +176,21 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
               Settings
             </button>
           </nav>
+
+          <div className="mt-4 space-y-2">
+            <button onClick={() => setShowSwitchModal(true)} className="w-full rounded-xl px-4 py-2 text-left text-vaulix-secondary-text transition-all hover:bg-vaulix-main-bg/40 hover:text-vaulix-main-text">
+              Switch Vault
+            </button>
+            {isUnlocked ? (
+              <button onClick={() => setShowDeleteModal(true)} className="w-full rounded-xl px-4 py-2 text-left text-red-400/90 transition-all hover:bg-red-500/10 hover:text-red-300">
+                Delete Vault
+              </button>
+            ) : (
+              <div className="rounded-xl border border-vaulix-surface-bg/70 px-4 py-2 text-xs leading-5 text-vaulix-secondary-text">
+                Unlock this vault with the master password to enable deletion and recovery-file generation.
+              </div>
+            )}
+          </div>
 
           <button onClick={onLock} className="mt-auto flex w-full items-center justify-center gap-2 rounded-xl px-4 py-2 text-vaulix-secondary-text transition-all hover:bg-vaulix-main-bg/40 hover:text-vaulix-main-text">
             <LogOut className="h-4 w-4" />
@@ -236,6 +267,41 @@ export default function DashboardLayout({ currentPage, setCurrentPage, onLock }:
           onSave={async (payload) => {
             await handleCredentialUpdated(editingEntry.id, payload)
             setEditingEntry(null)
+          }}
+        />
+      )}
+      {showSwitchModal && (
+        <SwitchVaultModal
+          vaults={vaults}
+          activeVaultId={activeVaultId}
+          onClose={() => setShowSwitchModal(false)}
+          onSelect={async (vaultId) => {
+            await onSwitchVault(vaultId)
+            setShowSwitchModal(false)
+          }}
+        />
+      )}
+      {showDeleteModal && currentVaultRecord && (
+        <DeleteVaultModal
+          vault={currentVaultRecord}
+          hasMasterPassword={!!masterPassword}
+          onClose={() => setShowDeleteModal(false)}
+          onEnsureRecoveryFile={async () => {
+            if (currentVaultRecord.vlk) return currentVaultRecord.vlk
+            if (!serializedVlx || !masterPassword) throw new Error('Unlock this vault first to generate a recovery file.')
+            const rotated = await rotateRecoveryWithMasterPassword({ serialized: serializedVlx, password: masterPassword })
+            const recoveryBytes = await serializeRecoveryToBinary(rotated.recovery)
+            const recoveryBase64 = btoa(String.fromCharCode(...recoveryBytes))
+            setSerializedVlx(rotated.serialized)
+            saveVlxLocal(rotated.serialized)
+            const updatedRecord = { ...currentVaultRecord, vlx: rotated.serialized, vlk: recoveryBase64 }
+            await saveVault(updatedRecord)
+            setCurrentVaultRecord(updatedRecord)
+            return recoveryBase64
+          }}
+          onDelete={async () => {
+            await onDeleteVault(currentVaultRecord.id)
+            setShowDeleteModal(false)
           }}
         />
       )}
@@ -328,14 +394,14 @@ function ResetPasswordModal({
 }: {
   serializedVlx: string
   onClose: () => void
-  onComplete: (payload: { serialized: string; newPassword: string }) => Promise<void>
+  onComplete: (payload: { serialized: string; newPassword: string; vlk: string }) => Promise<void>
 }) {
   const [recoveryPayload, setRecoveryPayload] = React.useState<RecoveryPayloadLike | null>(null)
   const [newPassword, setNewPassword] = React.useState('')
   const [confirmPassword, setConfirmPassword] = React.useState('')
   const [error, setError] = React.useState<string | null>(null)
   const [isProcessing, setIsProcessing] = React.useState(false)
-  const [resetResult, setResetResult] = React.useState<{ serialized: string; recoveryBytes: Uint8Array; filename: string; newPassword: string } | null>(null)
+  const [resetResult, setResetResult] = React.useState<{ serialized: string; recoveryBytes: Uint8Array; recoveryBase64: string; filename: string; newPassword: string } | null>(null)
   const [hasDownloaded, setHasDownloaded] = React.useState(false)
 
   const canReset = !!recoveryPayload && newPassword.length >= 8 && newPassword === confirmPassword
@@ -363,7 +429,8 @@ function ResetPasswordModal({
       })
       const recoveryBytes = await serializeRecoveryToBinary(result.newRecovery)
       const filename = `vaulix-recovery-reset-${new Date().toISOString().slice(0, 10)}.vlk`
-      setResetResult({ serialized: result.serialized, recoveryBytes, filename, newPassword })
+      const recoveryBase64 = btoa(String.fromCharCode(...recoveryBytes))
+      setResetResult({ serialized: result.serialized, recoveryBytes, recoveryBase64, filename, newPassword })
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Unable to reset master password.')
     } finally {
@@ -420,7 +487,7 @@ function ResetPasswordModal({
             <div className="flex items-center justify-between gap-3">
               <button onClick={handleDownload} className="btn-primary">Download new .vlk</button>
               <button
-                onClick={() => void onComplete({ serialized: resetResult.serialized, newPassword: resetResult.newPassword })}
+                onClick={() => void onComplete({ serialized: resetResult.serialized, newPassword: resetResult.newPassword, vlk: resetResult.recoveryBase64 })}
                 disabled={!hasDownloaded}
                 className="btn-primary"
               >
@@ -559,6 +626,166 @@ function AddCredentialModal({ onClose, onSave }: {
           <button onClick={onClose} className="btn-secondary">Cancel</button>
           <button onClick={handleSave} disabled={!canSave || isSaving} className="btn-primary ml-auto">Save credential</button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function SwitchVaultModal({
+  vaults,
+  activeVaultId,
+  onClose,
+  onSelect,
+}: {
+  vaults: VaultRecord[]
+  activeVaultId: string | null
+  onClose: () => void
+  onSelect: (vaultId: string) => Promise<void>
+}) {
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-2xl rounded-3xl border border-vaulix-surface-bg bg-vaulix-dark-card/95 p-6">
+        <h3 className="text-xl font-semibold">Switch vault</h3>
+        <p className="mt-1 text-sm text-vaulix-secondary-text">Choose a vault to access.</p>
+        <div className="mt-5 max-h-[380px] space-y-3 overflow-auto pr-1">
+          {vaults.map((vault) => (
+            <button
+              key={vault.id}
+              onClick={() => void onSelect(vault.id)}
+              className={`w-full rounded-2xl border p-4 text-left transition-all ${
+                vault.id === activeVaultId ? 'border-vaulix-accent bg-vaulix-accent/10' : 'border-vaulix-surface-bg bg-vaulix-main-bg/20 hover:border-vaulix-accent'
+              }`}
+            >
+              <div className="flex items-center justify-between gap-2">
+                <p className="font-semibold">{vault.name || 'Unnamed Vault'}</p>
+                {vault.source === 'imported' && <span className="rounded-full bg-vaulix-accent/15 px-3 py-1 text-xs font-semibold text-vaulix-accent">Imported</span>}
+              </div>
+              <p className="mt-2 text-xs text-vaulix-secondary-text">Created: {new Date(vault.createdAt).toLocaleString()}</p>
+              <p className="mt-1 text-xs text-vaulix-secondary-text">Last opened: {vault.lastOpenedAt ? new Date(vault.lastOpenedAt).toLocaleString() : 'Never'}</p>
+            </button>
+          ))}
+        </div>
+        <div className="mt-5 flex justify-end">
+          <button onClick={onClose} className="btn-secondary">Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function DeleteVaultModal({
+  vault,
+  hasMasterPassword,
+  onClose,
+  onEnsureRecoveryFile,
+  onDelete,
+}: {
+  vault: VaultRecord
+  hasMasterPassword: boolean
+  onClose: () => void
+  onEnsureRecoveryFile: () => Promise<string>
+  onDelete: () => Promise<void>
+}) {
+  const [step, setStep] = React.useState<'warning' | 'download' | 'confirm'>('warning')
+  const [downloadedVlx, setDownloadedVlx] = React.useState(false)
+  const [downloadedVlk, setDownloadedVlk] = React.useState(false)
+  const [confirmName, setConfirmName] = React.useState('')
+  const [error, setError] = React.useState<string | null>(null)
+
+  const downloadFile = (bytes: Uint8Array, filename: string) => {
+    const copy = new Uint8Array(bytes.length)
+    copy.set(bytes)
+    const blob = new Blob([copy], { type: 'application/octet-stream' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = filename
+    document.body.appendChild(a)
+    a.click()
+    a.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleDownloadVlx = () => {
+    if (!vault.vlx) return
+    const bytes = Uint8Array.from(atob(vault.vlx), (c) => c.charCodeAt(0))
+    downloadFile(bytes, `${(vault.name || 'vaulix-vault').replace(/[^a-z0-9_-]/gi, '-')}.vlx`)
+    setDownloadedVlx(true)
+  }
+
+  const handleDownloadVlk = async () => {
+    try {
+      setError(null)
+      const vlkBase64 = await onEnsureRecoveryFile()
+      const bytes = Uint8Array.from(atob(vlkBase64), (c) => c.charCodeAt(0))
+      downloadFile(bytes, `${(vault.name || 'vaulix-vault').replace(/[^a-z0-9_-]/gi, '-')}-recovery.vlk`)
+      setDownloadedVlk(true)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Unable to generate recovery file.')
+    }
+  }
+
+  const canProceedToConfirm = downloadedVlx && downloadedVlk
+  const canDelete = confirmName.trim() === (vault.name || 'Unnamed Vault')
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-2xl rounded-3xl border border-red-500/30 bg-vaulix-dark-card/95 p-6">
+        <h3 className="text-xl font-semibold text-red-300">Delete vault</h3>
+        {step === 'warning' && (
+          <div className="mt-4 space-y-4">
+            <p className="text-sm leading-7 text-vaulix-secondary-text">
+              You are about to permanently delete this vault from Vaulix on this device. This action will remove all credentials stored in this vault from local storage.
+              Ensure you understand this operation before proceeding.
+            </p>
+            <ul className="list-disc pl-5 text-sm text-vaulix-secondary-text">
+              <li>All credentials inside this vault will be deleted from Vaulix local storage.</li>
+              <li>You should download both `.vlx` and `.vlk` before deletion.</li>
+              <li>You can re-import later only if you keep those files safely.</li>
+            </ul>
+            <div className="flex items-center justify-between gap-3">
+              <button onClick={onClose} className="btn-secondary">Cancel</button>
+              <button onClick={() => setStep('download')} className="btn-primary ml-auto">I understand, continue</button>
+            </div>
+          </div>
+        )}
+        {step === 'download' && (
+          <div className="mt-4 space-y-4">
+            <p className="text-sm text-vaulix-secondary-text">Download both backup files before deletion (mandatory).</p>
+            {!hasMasterPassword && !vault.vlk && (
+              <p className="text-sm text-amber-300">
+                This vault must be unlocked first so Vaulix can generate a new `.vlk` recovery file for mandatory backup.
+              </p>
+            )}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <button onClick={handleDownloadVlx} disabled={!vault.vlx} className="btn-primary">Download .vlx</button>
+              <button onClick={() => void handleDownloadVlk()} disabled={!hasMasterPassword && !vault.vlk} className="btn-primary">
+                {vault.vlk ? 'Download .vlk' : 'Generate & Download .vlk'}
+              </button>
+            </div>
+            <div className="text-xs text-vaulix-secondary-text">
+              <p>.vlx downloaded: {downloadedVlx ? 'Yes' : 'No'}</p>
+              <p>.vlk downloaded: {downloadedVlk ? 'Yes' : 'No'}</p>
+            </div>
+            {error && <p className="text-sm text-red-400">{error}</p>}
+            <div className="flex items-center justify-between gap-3">
+              <button onClick={() => setStep('warning')} className="btn-secondary">Back</button>
+              <button onClick={() => setStep('confirm')} disabled={!canProceedToConfirm} className="btn-primary ml-auto">Continue</button>
+            </div>
+          </div>
+        )}
+        {step === 'confirm' && (
+          <div className="mt-4 space-y-4">
+            <p className="text-sm text-vaulix-secondary-text">Type vault name to confirm deletion: <span className="font-semibold text-vaulix-main-text">{vault.name || 'Unnamed Vault'}</span></p>
+            <input value={confirmName} onChange={(e) => setConfirmName(e.target.value)} className="input" placeholder="Type vault name exactly" />
+            <div className="flex items-center justify-between gap-3">
+              <button onClick={() => setStep('download')} className="btn-secondary">Back</button>
+              <button onClick={() => void onDelete()} disabled={!canDelete} className="rounded-lg bg-red-500 px-4 py-2 font-medium text-white disabled:cursor-not-allowed disabled:opacity-50">
+                Delete vault permanently
+              </button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

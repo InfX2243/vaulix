@@ -290,6 +290,45 @@ export async function addCredential(params: { serialized: string; password: stri
   updated.integrity = await computeIntegrity(updated.metadata, updated.vaultData)
   return { serialized: await serializeVault(updated), entry, entries }
 }
+export async function rotateRecoveryWithMasterPassword(params: {
+  serialized: string
+  password: string
+}): Promise<{ serialized: string; recovery: RecoveryPayloadLike }> {
+  const vlx = await deserializeVault(params.serialized)
+  const masterKey = await deriveMasterKey(params.password, Uint8Array.from(atob(vlx.encryption.salt), (c) => c.charCodeAt(0)))
+  const vekRaw = await unwrapKey(vlx.wrappedVek.withMasterKey, masterKey)
+
+  const newRecoveryKey = randomBase64(32)
+  const recoveryBytes = Uint8Array.from(atob(newRecoveryKey), (c) => c.charCodeAt(0))
+  const recoveryKey = await importAesKey(recoveryBytes)
+  const wrappedWithRecovery = await wrapKey(vekRaw, recoveryKey)
+
+  const now = new Date().toISOString()
+  const updated: VlxFile = {
+    ...vlx,
+    metadata: {
+      ...vlx.metadata,
+      updatedAt: now,
+      recoveryGeneratedAt: now,
+      lastUnlockedAt: now,
+    },
+    wrappedVek: {
+      ...vlx.wrappedVek,
+      withRecoveryKey: wrappedWithRecovery,
+    },
+  }
+  updated.integrity = await computeIntegrity(updated.metadata, updated.vaultData)
+
+  return {
+    serialized: await serializeVault(updated),
+    recovery: {
+      version: '1.0',
+      recoveryKey: newRecoveryKey,
+      wrappedVekWithRecovery: wrappedWithRecovery,
+      vaultId: updated.metadata.vaultId,
+    },
+  }
+}
 
 export async function updateCredential(params: {
   serialized: string

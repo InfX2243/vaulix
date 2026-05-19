@@ -6,9 +6,12 @@ export interface EncryptedFragment {
 export interface VaultRecord {
   id: string
   createdAt: string
+  lastOpenedAt?: string | null
+  source?: 'created' | 'imported'
   salt: string
   name?: string
   vlx?: string
+  vlk?: string
   vaultBlob: EncryptedFragment
   wrappedVekWithMaster: EncryptedFragment
   wrappedVekWithRecovery: EncryptedFragment
@@ -73,6 +76,27 @@ export async function loadVault() {
   })
 }
 
+export async function loadVaultById(id: string) {
+  const db = await openDatabase()
+  return new Promise<VaultRecord | null>((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readonly')
+    const store = transaction.objectStore(STORE_NAME)
+    const request = store.get(id)
+    request.onsuccess = () => {
+      const record = (request.result as VaultRecord | undefined) ?? null
+      if (record && !record.vlx) {
+        const localVlx = localStorage.getItem(LOCAL_VLX_KEY)
+        if (localVlx) {
+          resolve({ ...record, vlx: localVlx })
+          return
+        }
+      }
+      resolve(record)
+    }
+    request.onerror = () => reject(request.error)
+  })
+}
+
 export async function listVaults(): Promise<VaultRecord[]> {
   const db = await openDatabase()
   return new Promise((resolve, reject) => {
@@ -80,6 +104,23 @@ export async function listVaults(): Promise<VaultRecord[]> {
     const store = transaction.objectStore(STORE_NAME)
     const request = store.getAll()
     request.onsuccess = () => resolve(request.result as VaultRecord[])
+    request.onerror = () => reject(request.error)
+  })
+}
+
+export async function touchVaultOpenedAt(id: string, openedAt = new Date().toISOString()) {
+  const current = await loadVaultById(id)
+  if (!current) return
+  await saveVault({ ...current, lastOpenedAt: openedAt })
+}
+
+export async function deleteVaultById(id: string) {
+  const db = await openDatabase()
+  return new Promise<void>((resolve, reject) => {
+    const transaction = db.transaction(STORE_NAME, 'readwrite')
+    const store = transaction.objectStore(STORE_NAME)
+    const request = store.delete(id)
+    request.onsuccess = () => resolve()
     request.onerror = () => reject(request.error)
   })
 }
