@@ -68,3 +68,31 @@ flowchart LR
     IMP --> BIN2["Binary Envelope Decode + Digest Check"]
     BIN2 --> SAVE["Save Vault Local"]
 ```
+
+## Multi-Vault Continue Flow
+
+```mermaid
+flowchart TD
+    G["Gateway"] --> C["Continue Vault"]
+    C --> LIST["Show Local Vault List"]
+    LIST --> META["Show createdAt + lastOpenedAt + source badge"]
+    META --> PICK["User Picks Vault"]
+    PICK --> TOUCH["Update lastOpenedAt"]
+    TOUCH --> DASH["Open Selected Vault Dashboard"]
+```
+
+## In-Dashboard Vault Deletion Flow
+
+```mermaid
+flowchart TD
+    M["Vault Management"] --> W["Show Warning + Risk Notice"]
+    W --> ACK["User Acknowledges"]
+    ACK --> BK["Mandatory Backup Step"]
+    BK --> DVLX["Download .vlx"]
+    BK --> DVLK["Download .vlk"]
+    DVLX --> READY["Both Downloads Completed"]
+    DVLK --> READY
+    READY --> CONF["Type Vault Name Confirmation"]
+    CONF --> DEL["Delete Vault Locally"]
+    DEL --> REFRESH["Refresh Vault List + Active State"]
+```

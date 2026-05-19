@@ -67,6 +67,18 @@ Parsing fails on header/version/length/digest mismatch.
    - use `.vlk` recovery to unwrap VEK
    - re-wrap with new master password
    - rotate recovery key and issue new `.vlk`
+6. Multi-vault selection:
+   - all local vaults are listed in gateway continue flow
+   - user selects active vault by `vaultId`
+   - `lastOpenedAt` is updated when vault is selected/opened
+   - imported vaults are marked with `source: imported`
+7. In-dashboard vault management:
+   - switch active vault without returning to gateway
+   - delete flow requires:
+     - user acknowledgement
+     - mandatory backup downloads (`.vlx` + `.vlk`)
+     - typed vault-name confirmation
+   - vault deletion removes local record and refreshes active vault state
 
 ## 7. Security Considerations
 
